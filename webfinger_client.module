@@ -1,0 +1,108 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Webfinger Client - The very nature of WebFinger is experimentation.
+ *
+ * @author
+ * Stefan Auditor <stefan.auditor@erdfisch.de>
+ */
+
+/**
+ * See http://hueniverse.com/2009/09/implementing-webfinger/
+ */
+function webfinger_client_process($uri) {
+  // 1. Parse the account URI and identify the host name.
+  $identifier = webfinger_parse_uri($uri);
+  if (!$identifier) {
+    return array();
+  }
+
+  // 2. Obtain the host-meta file for the host at http://host/.well-known/host-meta
+  // using an HTTP GET request. The client must obey HTTP redirection (3xx) and
+  // should only use a document received with a success result code (2xx).
+  // This is where a DNS query will be added once it is figured out.
+  $url = 'http://' . $identifier->host . '/.well-known/host-meta';
+  $response = drupal_http_request($url);
+  if (!$response->code == 200) {
+    watchdog('webfinger', 'Could not obtain host-meta from @url', array('@url' => $url), WATCHDOG_ERROR);
+    return array();
+  }
+  $host_meta = $response->data;
+
+  // 3. Ensure that the host-meta has a matching <Host> element for the requested
+  // host. This will become more important when we add trust and signatures to
+  // the protocol.
+  $xml = new XMLReader;
+  $xml->xml($host_meta);
+  while ($xml->read()) {
+    if ($xml->name == 'hm:Host') {
+      $host = $xml->readString();
+      break;
+    }
+  }
+  if ($host != substr($url, 0, strlen($host))) {
+    watchdog('webfinger', 'Host element does not match host in host-meta from @url', array('@url' => $url), WATCHDOG_ERROR);
+    return array();
+  }
+
+  // 4. Find the first <Link> element that has a ‘rel’ attribute with a value of
+  // ‘lrdd’. Get the ‘template’ attribute from that <Link>.
+  $xml = new XMLReader;
+  $xml->xml($host_meta);
+  while ($xml->read()) {
+    if ($xml->name == 'Link' && $xml->getAttribute('rel') == 'lrdd') {
+      $template = $xml->getAttribute('template');
+      break;
+    }
+  }
+
+  // 5. Substitute the template variable ‘{uri}’ with the full account URI
+  // (including the ‘acct:’ scheme) after percent-encoding it.
+  $template = str_replace('{uri}', urlencode($identifier->raw), $template);
+  if (!valid_url($template)) {
+    watchdog('webfinger', 'Template element does not result in a valid template in host-meta from @url', array('@url' => $url), WATCHDOG_ERROR);
+    return array();
+  }
+
+  // 6. Fetch the account XRD by making an HTTP GET request to the URI generated
+  // by the template.
+  $response = drupal_http_request($template);
+  if (!$response->code == 200) {
+    watchdog('webfinger', 'Could not obtain account XRD from @url', array('@url' => $template), WATCHDOG_ERROR);
+    return array();
+  }
+
+  $xrd_data = webfinger_parse_xrd($response->data);
+  return $xrd_data;
+}
+
+/**
+ *
+ */
+function webfinger_client_process_test($uri) {
+  $xrd_raw = webfinger_client_process($uri);
+  $results = module_invoke_all('webfinger_client_process', $xrd_raw);
+  module_invoke_all('webfinger_client_process_results', $results);
+  return '<pre>' . print_r($results, 1) . '</pre>';
+}
+
+/**
+ * Example implementation of HOOK_webfinger_client_process().
+ */
+function webfinger_webfinger_client_process($xrd_raw) {
+/*
+  foreach ($xrd_raw as $dataset) {
+    // Process dataset
+  }
+*/
+}
+
+/**
+ * Example implementation of HOOK_webfinger_client_process_results().
+ */
+function webfinger_webfinger_client_process_results($results) {
+  //dsm($results);
+}
+

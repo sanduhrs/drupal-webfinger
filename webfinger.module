@@ -1,0 +1,203 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Webfinger - The very nature of WebFinger is experimentation.
+ *
+ * @author
+ * Stefan Auditor <stefan.auditor@erdfisch.de>
+ */
+ 
+/**
+ * Implement HOOK_menu().
+ */
+function webfinger_menu() {
+  $items['.well-known/host-meta'] = array( 
+    'page callback' => 'xrd_page',
+    'page arguments' => array('host-meta'),
+    'access callback' => TRUE, 
+    'type' => MENU_CALLBACK,
+  );
+  $items['webfinger'] = array( 
+    'page callback' => 'xrd_page',
+    'page arguments' => array('webfinger'),
+    'access callback' => TRUE, 
+    'type' => MENU_CALLBACK,
+  );
+  $items['webfinger/test'] = array( 
+    'page callback' => 'webfinger_client_process_test',
+    'page arguments' => array('acct:admin@webfinger.git'),
+    'access callback' => TRUE, 
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implementation of HOOK_xrd_data_alter().
+ */
+function webfinger_xrd_data_alter($data, $context) {
+  switch($context) {
+    case 'host-meta':
+      $host_meta = array(
+        array(
+          'element' => array(
+            'type' => 'hm:Host',
+            'value' => url(NULL, array('absolute' => TRUE)),
+          ),
+        ),
+        array(
+          'element' => array(
+            'type' => 'Link',
+            'value' => '',
+            'attributes' => array(
+              'rel' => 'lrdd',
+              'template' => url('webfinger', array('query' => 'uri={uri}', 'absolute' => TRUE)),
+            ),
+          ),
+          array(
+            'element' => array(
+              'type' => 'Title',
+              'value' => 'Resource Descriptor',
+            ),
+          ),
+        ),
+      );
+      array_push($data['default'], $host_meta);
+      $data['default']['element']['attributes']['xmlns:hm'] = 'http://host-meta.net/xrd/1.0';
+      break;
+    case 'webfinger':
+      $identifier = webfinger_get_identifier();
+      if (!$identifier) {
+        return;
+      }
+      $account = user_load(array('mail' => $identifier->mail, 'status' => 1));
+      $webfinger = array(
+        array(
+          'element' => array(
+            'type' => 'Subject',
+            'value' => 'acct:' . $identifier->mail,
+          ),
+        ),
+        array(
+          'element' => array(
+            'type' => 'Alias',
+            'value' => url('user/' . $account->uid, array('absolute' => TRUE)),
+          ),
+        ),
+        array(
+          'element' => array(
+            'type' => 'Link',
+            'value' => '',
+            'attributes' => array(
+              'rel' => 'http://webfinger.net/rel/profile-page',
+              'type' => 'text/html',
+              'href' => url('user/' . $account->uid, array('absolute' => TRUE)),
+            ),
+          ),
+        ),
+        array(
+          'element' => array(
+            'type' => 'Link',
+            'value' => '',
+            'attributes' => array(
+              'rel' => 'describedby',
+              'type' => 'text/html',
+              'href' => url('user/' . $account->uid, array('absolute' => TRUE)),
+            ),
+          ),
+        ),
+      );
+      if (variable_get('user_pictures', FALSE) && !empty($account->picture)) {
+        $webfinger[] = array(
+          'element' => array(
+            'type' => 'Link',
+            'value' => '',
+            'attributes' => array(
+              'rel' => 'http://webfinger.net/rel/avatar',
+              'href' => url($account->picture, array('absolute' => TRUE)),
+            ),
+          ),
+        );
+      }
+      array_push($data['default'], $webfinger);
+      break;
+  }
+}
+
+/**
+ * Get identifier
+ */
+function webfinger_get_identifier($uri = NULL) {
+  static $identifier;
+  if (is_object($identifier[$uri]) || $identifier[$uri] === FALSE) {
+    return $identifier[$uri];
+  }
+  else if (!empty($_GET['uri']) || !empty($uri)) {
+    $uri = !empty($uri) ? $uri : $_GET['uri'];
+    $items = webfinger_parse_uri($uri);
+    $account = user_load(array('mail' => $items->mail, 'status' => 1));
+    if ($account->uid) {
+      $identifier[$uri] = new stdClass();
+      $identifier[$uri] = (object) $items;
+    }
+    else {
+      $identifier[$uri] = FALSE;
+    }
+  }
+  return $identifier[$uri];
+}
+
+/**
+ * Parse identifier URI
+ */
+function webfinger_parse_uri($uri) {
+  list($scheme, $mail) = explode(':', $uri);
+  $mail = urldecode($mail);
+  list($id, $host) = explode('@', $mail);
+  if (!valid_email_address($mail)) {
+    $scheme = $id = $host = $mail = NULL;
+  }
+  return (object) array(
+    'scheme' => $scheme,
+    'id'     => $id,
+    'host'   => $host,
+    'mail'   => $mail,
+    'raw'    => $uri,
+  );
+}
+
+/**
+ * Parse XRD document
+ */
+function webfinger_parse_xrd($data, $names = array(), $attribute_names = array()) {
+  $names += array('Subject', 'Alias', 'Link');
+  $attribute_names += array('href', 'rel', 'template', 'type');
+  $xrd_data = array();
+
+  $xml = new XMLReader;
+  $xml->xml($data);
+  while ($xml->read()) {
+    if ($xml->nodeType == XMLReader::ELEMENT) {
+      $name = $xml->name;
+      if (in_array($name, $names)) {
+        $element = array(
+          'type' => $xml->name,
+          'value' => $xml->readString(),
+          'attributes' => array(),
+        );
+        if ($xml->hasAttributes) {
+          foreach ($attribute_names as $attribute_name) {
+            if ($attribute = $xml->getAttribute($attribute_name)) {
+              $element['attributes'][$attribute_name] = $attribute;
+            }
+          }
+        }
+        array_push($xrd_data, $element);
+      }
+    }
+  }
+  return count($xrd_data) ? $xrd_data : array();
+}
+

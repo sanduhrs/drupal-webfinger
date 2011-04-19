@@ -1,0 +1,4 @@
+; $Id$
+name = "Webfinger Client"
+description = "The very nature of WebFinger is experimentation."
+core = 6.x
