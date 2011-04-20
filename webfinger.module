@@ -53,7 +53,7 @@ function webfinger_xrd_data_alter($data, $context) {
             'value' => '',
             'attributes' => array(
               'rel' => 'lrdd',
-              'template' => url('webfinger', array('query' => 'uri={uri}', 'absolute' => TRUE)),
+              'template' => url('webfinger', array('query' => array('uri' => '{uri}'), 'absolute' => TRUE)),
             ),
           ), array(
             'element' => array(
@@ -71,7 +71,7 @@ function webfinger_xrd_data_alter($data, $context) {
       if (!$identifier) {
         return;
       }
-      $account = user_load(array('mail' => $identifier->mail, 'status' => 1));
+      $account = array_shift(user_load_multiple(array(), array('mail' => $identifier->mail, 'status' => 1)));
       $webfinger = array(
         array(
           'element' => array(
@@ -136,7 +136,7 @@ function webfinger_get_identifier($uri = NULL) {
   else if (!empty($_GET['uri']) || !empty($uri)) {
     $uri = !empty($uri) ? $uri : $_GET['uri'];
     $items = webfinger_parse_uri($uri);
-    $account = user_load(array('mail' => $items->mail, 'status' => 1));
+    $account = array_shift(user_load_multiple(array(), array('mail' => $items->mail, 'status' => 1)));
     if ($account->uid) {
       $identifier[$uri] = new stdClass();
       $identifier[$uri] = (object) $items;

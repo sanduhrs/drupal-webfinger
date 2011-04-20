@@ -1,4 +1,4 @@
 ; $Id$
 name = "Webfinger"
 description = "The very nature of WebFinger is experimentation."
-core = 6.x
+core = 7.x
