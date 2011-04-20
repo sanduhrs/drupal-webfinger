@@ -92,11 +92,11 @@ function webfinger_client_process_test($uri) {
  * Example implementation of HOOK_webfinger_client_process().
  */
 function webfinger_webfinger_client_process($xrd_raw) {
-/*
-  foreach ($xrd_raw as $dataset) {
-    // Process dataset
-  }
-*/
+  /*
+   foreach ($xrd_raw as $dataset) {
+   // Process dataset
+   }
+   */
 }
 
 /**

@@ -8,27 +8,27 @@
  * @author
  * Stefan Auditor <stefan.auditor@erdfisch.de>
  */
- 
+
 /**
  * Implement HOOK_menu().
  */
 function webfinger_menu() {
-  $items['.well-known/host-meta'] = array( 
+  $items['.well-known/host-meta'] = array(
     'page callback' => 'xrd_page',
     'page arguments' => array('host-meta'),
-    'access callback' => TRUE, 
+    'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
-  $items['webfinger'] = array( 
+  $items['webfinger'] = array(
     'page callback' => 'xrd_page',
     'page arguments' => array('webfinger'),
-    'access callback' => TRUE, 
+    'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
-  $items['webfinger/test'] = array( 
+  $items['webfinger/test'] = array(
     'page callback' => 'webfinger_client_process_test',
     'page arguments' => array('acct:admin@webfinger.git'),
-    'access callback' => TRUE, 
+    'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
   return $items;
@@ -38,7 +38,7 @@ function webfinger_menu() {
  * Implementation of HOOK_xrd_data_alter().
  */
 function webfinger_xrd_data_alter($data, $context) {
-  switch($context) {
+  switch ($context) {
     case 'host-meta':
       $host_meta = array(
         array(
@@ -55,8 +55,7 @@ function webfinger_xrd_data_alter($data, $context) {
               'rel' => 'lrdd',
               'template' => url('webfinger', array('query' => 'uri={uri}', 'absolute' => TRUE)),
             ),
-          ),
-          array(
+          ), array(
             'element' => array(
               'type' => 'Title',
               'value' => 'Resource Descriptor',
@@ -161,10 +160,10 @@ function webfinger_parse_uri($uri) {
   }
   return (object) array(
     'scheme' => $scheme,
-    'id'     => $id,
-    'host'   => $host,
-    'mail'   => $mail,
-    'raw'    => $uri,
+    'id' => $id,
+    'host' => $host,
+    'mail' => $mail,
+    'raw' => $uri,
   );
 }
 
